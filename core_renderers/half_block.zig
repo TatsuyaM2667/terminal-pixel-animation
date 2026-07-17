@@ -11,7 +11,7 @@ export fn generate_terminal_cells(
     if (target_width == 0 or target_height == 0) return;
     if (in_width == 0 or in_height == 0) return;
 
-    // 出力ピクセルサイズ: 幅 = target_width, 高さ = target_height * 2 (1セル = 縦2ピクセル)
+    // 出力ピクセル
     const out_pixel_width = target_width;
     const out_pixel_height = target_height * 2;
 
