@@ -2,6 +2,22 @@
 name = "terminal-pixel-animation"
 version = "0.1.0"
 edition = "2024"
+authors = ["Tatsuya Miura <miuranosuketatsuya06@gmail.com>"]
+repository = "https://github.com/TatsuyaM2667/terminal-pixel-animation"
+description = "Render pixel images as Unicode characters (Braille / Half-block) in the terminal with True Color support"
 license = "MIT"
+readme = "README.md"
+keywords = ["terminal", "tui", "braille", "unicode", "pixel"]
+categories = ["rendering", "command-line-interface", "graphics", "multimedia"]
 build = "build.rs"
+rust-version = "1.85"
+
 [dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
+
+[[example]]
+name = "demo"
+path = "examples/demo.rs"

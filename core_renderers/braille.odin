@@ -1,4 +1,4 @@
-package main
+package braille
 @(export)
 generate_braille_cells :: proc "c" (
 	in_pixels: [^]u8,
