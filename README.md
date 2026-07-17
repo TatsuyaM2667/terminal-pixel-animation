@@ -1,41 +1,38 @@
-for row in 0..24 {
-    for col in 0..80 {
-        let idx = ((row * 80 + col) * 8) as usize;
+# terminal-pixel-animation
 
-        // Decode the Braille UTF-8 character
-        let code_point = u32::from_le_bytes(cells[idx..idx+4].try_into().unwrap());
-        let ch = char::from_u32(code_point).unwrap_or(' ');
+Render pixel images as Unicode characters in the terminal with True Color support.
 
-        // Read the RGB color
-        let (r, g, b) = (cells[idx+4], cells[idx+5], cells[idx+6]);
+This library converts RGB pixel data into terminal-friendly Unicode art using two rendering backends written in high-performance systems languages (Odin and Zig), exposed to Rust via C FFI.
 
-        // Use with any ANSI-capable renderer...
-    }
-}
+## Features
+
+| Renderer | Language | Cells per pixel | Resolution | Best for |
+|---|---|---|---|---|
+| **Braille** | Odin | 2x4 (8 px/cell) | High | Detailed still images, thumbnails |
+| **Half-block** | Zig | 1x2 (2 px/cell) | Medium | High frame-rate video playback |
+
+- Aspect-ratio-preserving resize with letterboxing
+- ANSI True Color (24-bit) output helpers
+- Luminance-weighted color averaging with saturation boost (Braille mode)
+
+## Installation
+
+```toml
+[dependencies]
+terminal-pixel-animation = "0.1"
 ```
 
-## Building from Source
+> **Note:** Requires `odin`, `zig`, and `objcopy` compilers in your `PATH` at build time.
 
-```bash
-cargo build --release
-```
+## Quick Start
 
-The build script compiles Odin and Zig source files into static libraries and links them into the Rust crate automatically.
+```rust
+use terminal_pixel_animation::{render_braille, print_braille_to_terminal};
 
-### Dependencies
+// Your RGB8 pixel buffer (width * height * 3 bytes)
+let pixels: Vec<u8> = load_your_image();
+let (width, height) = (320u32, 240u32);
 
-- [Rust](https://rustup.rs/) (edition 2024)
-- [Odin compiler](https://odin-lang.org/)
-- [Zig compiler](https://ziglang.org/)
-- `objcopy` (binutils)
+// Render into Braille cells (80 columns x 30 rows)
+let cells = render_braille(&pixels, width, height, 80, 30).unwrap();
 
-## Example
-
-```bash
-cargo run --example demo -- path/to/image.png braille
-cargo run --example demo -- path/to/image.png halfblock
-```
-
-## License
-
-MIT
