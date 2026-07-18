@@ -1,4 +1,4 @@
-//! # terminal-pixel-animation
+//! # web-pixel-animation
 //!
 //! Render pixel images as Unicode characters in the terminal with True Color support.
 //!
@@ -24,8 +24,13 @@
 //! ```
 
 use std::fmt;
-use std::io::{self, Write};
 use std::os::raw::{c_uchar, c_uint};
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::io::{self, Write};
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
 
 /// Errors that can occur during rendering.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,6 +51,13 @@ impl fmt::Display for RenderError {
 }
 
 impl std::error::Error for RenderError {}
+
+#[cfg(target_arch = "wasm32")]
+impl From<RenderError> for JsValue {
+    fn from(e: RenderError) -> JsValue {
+        JsValue::from_str(&e.to_string())
+    }
+}
 
 // ---------------------------------------------------------------------------
 // FFI bindings
@@ -87,17 +99,10 @@ unsafe extern "C" {
 /// - Bytes 4–6: The averaged RGB color for the active dots.
 /// - Byte 7: Reserved (zero).
 ///
-/// # Arguments
-///
-/// * `pixels` – Flat RGB8 buffer (`width * height * 3` bytes).
-/// * `in_width` – Source image width in pixels.
-/// * `in_height` – Source image height in pixels.
-/// * `target_width` – Output width in terminal cells.
-/// * `target_height` – Output height in terminal cells.
-///
 /// # Errors
 ///
 /// Returns [`RenderError::InvalidDimensions`] if any dimension is zero.
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn render_braille(
     pixels: &[u8],
     in_width: u32,
@@ -135,20 +140,11 @@ pub fn render_braille(
 /// # Output format
 ///
 /// Each cell occupies **6 bytes**: `[R_fg, G_fg, B_fg, R_bg, G_bg, B_bg]`
-/// - Bytes 0–2: Foreground (top pixel) RGB.
-/// - Bytes 3–5: Background (bottom pixel) RGB.
-///
-/// # Arguments
-///
-/// * `pixels` – Flat RGB8 buffer (`width * height * 3` bytes).
-/// * `in_width` – Source image width in pixels.
-/// * `in_height` – Source image height in pixels.
-/// * `target_width` – Output width in terminal cells.
-/// * `target_height` – Output height in terminal cells.
 ///
 /// # Errors
 ///
 /// Returns [`RenderError::InvalidDimensions`] if any dimension is zero.
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub fn render_half_block(
     pixels: &[u8],
     in_width: u32,
@@ -178,10 +174,10 @@ pub fn render_half_block(
 }
 
 // ---------------------------------------------------------------------------
-// Terminal output helpers
+// Terminal output helpers (native only — meaningless on wasm32-unknown-unknown)
 // ---------------------------------------------------------------------------
 
-/// Decode a little-endian u32 byte sequence into a Unicode scalar value.
+#[cfg(not(target_arch = "wasm32"))]
 fn le_bytes_to_char(bytes: &[u8]) -> Option<char> {
     if bytes.len() < 4 {
         return None;
@@ -191,15 +187,7 @@ fn le_bytes_to_char(bytes: &[u8]) -> Option<char> {
 }
 
 /// Print Braille cell data to stdout using ANSI True Color escape codes.
-///
-/// Clears the screen and writes the rendered Braille art. Requires a terminal
-/// that supports 24-bit True Color (`\x1b[38;2;R;G;Bm`).
-///
-/// # Arguments
-///
-/// * `cells` – Buffer returned by [`render_braille`].
-/// * `target_width` – Width used in the original render call.
-/// * `target_height` – Height used in the original render call.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn print_braille_to_terminal(cells: &[u8], target_width: u32, target_height: u32) {
     let mut out = io::stdout();
     let _ = write!(out, "\x1b[2J\x1b[H");
@@ -229,15 +217,7 @@ pub fn print_braille_to_terminal(cells: &[u8], target_width: u32, target_height:
 }
 
 /// Print half-block cell data to stdout using ANSI True Color escape codes.
-///
-/// Clears the screen and writes the rendered half-block art. Each cell is
-/// rendered as `▀` with foreground and background colors set via escape codes.
-///
-/// # Arguments
-///
-/// * `cells` – Buffer returned by [`render_half_block`].
-/// * `target_width` – Width used in the original render call.
-/// * `target_height` – Height used in the original render call.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn print_halfblock_to_terminal(cells: &[u8], target_width: u32, target_height: u32) {
     let mut out = io::stdout();
     let _ = write!(out, "\x1b[2J\x1b[H");
