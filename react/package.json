@@ -1,0 +1,45 @@
+{
+  "name": "terminal-pixel-animation-react",
+  "version": "0.2.0",
+  "description": "React hooks and components for terminal-pixel-animation WASM renderer",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TatsuyaM2667/terminal-pixel-animation"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "terminal-pixel-animation": ">=0.2.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "react": "^18.0.0",
+    "terminal-pixel-animation": "file:../pkg",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "react",
+    "terminal",
+    "braille",
+    "unicode",
+    "pixel",
+    "wasm",
+    "webassembly"
+  ]
+}

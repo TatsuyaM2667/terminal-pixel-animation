@@ -18,9 +18,21 @@ This library converts RGB pixel data into terminal-friendly Unicode art using tw
 
 ## Installation
 
+### Rust (crates.io)
+
 ```toml
 [dependencies]
-terminal-pixel-animation = "0.1"
+terminal-pixel-animation = "0.2"
+```
+
+### npm (Browser / React)
+
+```bash
+# Core WASM module
+npm install terminal-pixel-animation
+
+# React hooks (optional)
+npm install terminal-pixel-animation-react
 ```
 
 > **Note:** Requires `odin`, `zig`, and `objcopy` compilers in your `PATH` at build time.
@@ -28,7 +40,7 @@ terminal-pixel-animation = "0.1"
 ### WASM (Browser)
 
 ```bash
-wasm-pack build --target web --out-dir pkg
+wasm-pack build --target bundler --out-dir pkg
 ```
 
 This produces a `pkg/` directory containing the WASM binary, JS glue, and TypeScript declarations. Also requires `wasm-pack` in your `PATH`.
@@ -54,7 +66,7 @@ print_braille_to_terminal(&cells, 80, 30);
 ### WASM (Browser)
 
 ```js
-import init, { render_braille, render_half_block } from "./terminal_pixel_animation.js";
+import init, { render_braille, render_half_block } from "terminal-pixel-animation";
 
 await init();
 
@@ -67,6 +79,38 @@ for (let i = 0; i < cells.length; i += 8) {
     const ch = String.fromCodePoint(cp);
     const r = cells[i+4], g = cells[i+5], b = cells[i+6];
     // Draw ch with color rgb(r, g, b) on a canvas...
+}
+```
+
+### React
+
+```tsx
+import { WasmProvider, useBraille } from "terminal-pixel-animation-react";
+
+function App() {
+  return (
+    <WasmProvider>
+      <PixelCanvas />
+    </WasmProvider>
+  );
+}
+
+function PixelCanvas() {
+  const [pixels, setPixels] = useState<Uint8Array | null>(null);
+  const { decoded, loading } = useBraille(pixels, 320, 240, 80, 30);
+
+  if (loading) return <p>Loading WASM...</p>;
+  if (!decoded) return null;
+
+  return (
+    <pre style={{ fontFamily: "monospace", lineHeight: "1", fontSize: "10px" }}>
+      {decoded.map((cell, i) => (
+        <span key={i} style={{ color: `rgb(${cell.r},${cell.g},${cell.b})` }}>
+          {cell.char}
+        </span>
+      ))}
+    </pre>
+  );
 }
 ```
 
@@ -121,6 +165,30 @@ for row in 0..24 {
     }
 }
 ```
+
+### React Hooks
+
+```tsx
+import { WasmProvider, useBraille, useHalfBlock } from "terminal-pixel-animation-react";
+
+// Wrap your app with WasmProvider (loads the WASM module once)
+function App() {
+  return (
+    <WasmProvider>
+      <MyComponent />
+    </WasmProvider>
+  );
+}
+
+function MyComponent() {
+  // Pass RGB8 pixel data; hook returns decoded cells
+  const { cells, decoded, loading, error } = useBraille(pixels, 320, 240, 80, 30);
+  // decoded: [{ char, r, g, b }, ...]  — flat array, row-major order
+
+  const halfblock = useHalfBlock(pixels, 320, 240, 80, 30);
+  // halfblock.decoded: [{ rFg, gFg, bFg, rBg, gBg, bBg }, ...]
+}
+```
 ## Building from Source
 
 ### Native
@@ -132,7 +200,7 @@ cargo build --release
 ### WASM
 
 ```bash
-wasm-pack build --target web --out-dir pkg
+wasm-pack build --target bundler --out-dir pkg
 ```
 
 The build script detects the target architecture and cross-compiles Odin and Zig source files accordingly (`freestanding_wasm32` / `wasm32-freestanding` for WASM).
@@ -164,6 +232,48 @@ python3 -m http.server 8080
 ```
 
 The demo supports webcam live feed and video file playback, rendering frames to a canvas using `requestAnimationFrame`.
+
+### React
+
+```bash
+cd react && npm install && npm run build
+```
+
+## Publishing
+
+### npm (WASM core + React hooks)
+
+```bash
+# 1. Login to npm (first time only)
+npm login
+
+# 2. Publish the core WASM package
+cd pkg
+npm publish
+
+# 3. Publish the React hooks package
+cd ../react
+npm publish
+```
+
+### crates.io (Rust crate)
+
+```bash
+# 1. Login to crates.io (first time only)
+cargo login <your-api-token>
+
+# 2. Publish
+cargo publish
+```
+
+### Version Management
+
+```bash
+# Update versions before publishing
+npm version patch   # 0.2.0 -> 0.2.1
+npm version minor   # 0.2.0 -> 0.3.0
+npm version major   # 0.2.0 -> 1.0.0
+```
 
 ## License
 
