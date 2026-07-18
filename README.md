@@ -1,8 +1,14 @@
 # terminal-pixel-animation
 
-Render pixel images as Unicode characters in the terminal with True Color support.
+[![crates.io](https://img.shields.io/crates/v/terminal-pixel-animation.svg)](https://crates.io/crates/terminal-pixel-animation)
+[![npm (core)](https://img.shields.io/npm/v/terminal-pixel-animation.svg)](https://www.npmjs.com/package/terminal-pixel-animation)
+[![npm (react)](https://img.shields.io/npm/v/terminal-pixel-animation-react.svg)](https://www.npmjs.com/package/terminal-pixel-animation-react)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-This library converts RGB pixel data into terminal-friendly Unicode art using two rendering backends written in high-performance systems languages (Odin and Zig), exposed to Rust via C FFI. Also available as a WebAssembly module for use in the browser.
+Render pixel images as Unicode characters in the terminal with True Color support.
+Also available as a WebAssembly module for browser use with React hooks.
+
+RGBピクセル画像をUnicode文字に変換し、ターミナルやブラウザにTrue Colorで表示するライブラリ。React Hooks対応。
 
 ## Features
 
@@ -15,6 +21,11 @@ This library converts RGB pixel data into terminal-friendly Unicode art using tw
 - ANSI True Color (24-bit) output helpers
 - Luminance-weighted color averaging with saturation boost (Braille mode)
 - **WebAssembly** target for browser use via `wasm-pack` / `wasm-bindgen`
+- **React Hooks** (`WasmProvider`, `useBraille`, `useHalfBlock`)
+
+アスペクト比を保ったリサイズ、ANSI True Color出力、WebAssembly対応、React Hooks対応。
+
+---
 
 ## Installation
 
@@ -25,25 +36,21 @@ This library converts RGB pixel data into terminal-friendly Unicode art using tw
 terminal-pixel-animation = "0.2"
 ```
 
-### npm (Browser / React)
+### npm
 
 ```bash
-# Core WASM module
+# Core WASM module / WASMコアモジュール
 npm install terminal-pixel-animation
 
-# React hooks (optional)
+# React hooks (optional) / React Hooks（オプション）
 npm install terminal-pixel-animation-react
 ```
 
-> **Note:** Requires `odin`, `zig`, and `objcopy` compilers in your `PATH` at build time.
+> **Build dependencies:** Requires `odin`, `zig`, `objcopy`, and `wasm-pack` in your `PATH`.
+>
+> **ビルド時の依存関係:** Rust, Odin, Zig, objcopy (binutils), wasm-pack が必要です。
 
-### WASM (Browser)
-
-```bash
-wasm-pack build --target bundler --out-dir pkg
-```
-
-This produces a `pkg/` directory containing the WASM binary, JS glue, and TypeScript declarations. Also requires `wasm-pack` in your `PATH`.
+---
 
 ## Quick Start
 
@@ -52,7 +59,7 @@ This produces a `pkg/` directory containing the WASM binary, JS glue, and TypeSc
 ```rust
 use terminal_pixel_animation::{render_braille, print_braille_to_terminal};
 
-// Your RGB8 pixel buffer (width * height * 3 bytes)
+// RGB8 pixel buffer (width * height * 3 bytes)
 let pixels: Vec<u8> = load_your_image();
 let (width, height) = (320u32, 240u32);
 
@@ -70,7 +77,7 @@ import init, { render_braille, render_half_block } from "terminal-pixel-animatio
 
 await init();
 
-// Your RGB8 pixel buffer as a Uint8Array
+// RGB8 pixel buffer as Uint8Array
 const cells = render_braille(rgb, videoWidth, videoHeight, cols, rows);
 
 // Decode Braille cells
@@ -85,6 +92,7 @@ for (let i = 0; i < cells.length; i += 8) {
 ### React
 
 ```tsx
+import { useState, useEffect } from "react";
 import { WasmProvider, useBraille } from "terminal-pixel-animation-react";
 
 function App() {
@@ -114,64 +122,108 @@ function PixelCanvas() {
 }
 ```
 
-## API
+---
 
-### Rendering (Native)
+## WASM Guide
 
-```rust
-// Braille: 8 bytes per cell [utf8;4, R, G, B, _]
-let cells = render_braille(&pixels, w, h, cols, rows)?;
+### Setup
 
-// Half-block: 6 bytes per cell [R_fg, G_fg, B_fg, R_bg, G_bg, B_bg]
-let cells = render_half_block(&pixels, w, h, cols, rows)?;
+```bash
+npm init -y
+npm install terminal-pixel-animation
 ```
 
-### Rendering (WASM)
+### Browser Usage
 
 ```js
-// Braille: Uint8Array, 8 bytes per cell [utf8_byte0, utf8_byte1, utf8_byte2, utf8_byte3, R, G, B, _]
-const cells = render_braille(rgb, in_width, in_height, target_cols, target_rows);
+import init, { render_braille, render_half_block } from "terminal-pixel-animation";
 
-// Half-block: Uint8Array, 6 bytes per cell [R_fg, G_fg, B_fg, R_bg, G_bg, B_bg]
-const cells = render_half_block(rgb, in_width, in_height, target_cols, target_rows);
-```
+// Initialize WASM (call once)
+await init();
 
-### Terminal Output
+// Get RGB buffer from webcam
+const canvas = document.createElement("canvas");
+const ctx = canvas.getContext("2d");
+canvas.width = video.videoWidth;
+canvas.height = video.videoHeight;
+ctx.drawImage(video, 0, 0);
+const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-```rust
-print_braille_to_terminal(&cells, cols, rows);
-print_halfblock_to_terminal(&cells, cols, rows);
-```
+// Convert RGBA to RGB
+const rgb = new Uint8Array(canvas.width * canvas.height * 3);
+for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+    rgb[j] = imageData.data[i];
+    rgb[j + 1] = imageData.data[i + 1];
+    rgb[j + 2] = imageData.data[i + 2];
+}
 
-### Custom Rendering
+// Braille rendering
+const cells = render_braille(rgb, canvas.width, canvas.height, 80, 30);
 
-The library returns raw cell buffers, so you can implement your own output:
+// Draw on canvas
+const displayCanvas = document.getElementById("output");
+const displayCtx = displayCanvas.getContext("2d");
+displayCanvas.width = 80 * 8;
+displayCanvas.height = 30 * 14;
 
-```rust
-let cells = render_braille(&pixels, w, h, 80, 24)?;
+for (let i = 0; i < cells.length; i += 8) {
+    const cp = cells[i] | (cells[i+1] << 8) | (cells[i+2] << 16) | (cells[i+3] << 24);
+    const ch = String.fromCodePoint(cp);
+    const r = cells[i+4], g = cells[i+5], b = cells[i+6];
 
-for row in 0..24 {
-    for col in 0..80 {
-        let idx = ((row * 80 + col) * 8) as usize;
-
-        // Decode the Braille UTF-8 character
-        let code_point = u32::from_le_bytes(cells[idx..idx+4].try_into().unwrap());
-        let ch = char::from_u32(code_point).unwrap_or(' ');
-
-        // Read the RGB color
-        let (r, g, b) = (cells[idx+4], cells[idx+5], cells[idx+6]);
-
-        // Use with any ANSI-capable renderer...
+    if (ch !== "\0" && ch !== " ") {
+        const col = (i / 8) % 80;
+        const row = Math.floor((i / 8) / 80);
+        displayCtx.fillStyle = `rgb(${r},${g},${b})`;
+        displayCtx.font = "14px monospace";
+        displayCtx.fillText(ch, col * 8, row * 14);
     }
 }
 ```
 
-### React Hooks
+### Half-block Rendering
+
+```js
+const cells = render_half_block(rgb, canvas.width, canvas.height, 80, 30);
+
+// Cell is 6 bytes: [R_fg, G_fg, B_fg, R_bg, G_bg, B_bg]
+for (let i = 0; i < cells.length; i += 6) {
+    const rFg = cells[i], gFg = cells[i+1], bFg = cells[i+2];
+    const rBg = cells[i+3], gBg = cells[i+4], bBg = cells[i+5];
+
+    const col = (i / 6) % 80;
+    const row = Math.floor((i / 6) / 80);
+
+    // Upper half (foreground)
+    displayCtx.fillStyle = `rgb(${rFg},${gFg},${bFg})`;
+    displayCtx.fillRect(col * 8, row * 14, 8, 7);
+
+    // Lower half (background)
+    displayCtx.fillStyle = `rgb(${rBg},${gBg},${bBg})`;
+    displayCtx.fillRect(col * 8, row * 14 + 7, 8, 7);
+}
+```
+
+---
+
+## React Guide
+
+### Setup
+
+```bash
+npx create-vite@latest my-app --template react-ts
+cd my-app
+npm install terminal-pixel-animation terminal-pixel-animation-react
+npm run dev
+```
+
+### WasmProvider
+
+Wrap your app with `WasmProvider` at the root. The WASM module is loaded once.
 
 ```tsx
-import { WasmProvider, useBraille, useHalfBlock } from "terminal-pixel-animation-react";
+import { WasmProvider } from "terminal-pixel-animation-react";
 
-// Wrap your app with WasmProvider (loads the WASM module once)
 function App() {
   return (
     <WasmProvider>
@@ -179,17 +231,207 @@ function App() {
     </WasmProvider>
   );
 }
+```
+
+### useBraille Hook
+
+```tsx
+import { useBraille } from "terminal-pixel-animation-react";
 
 function MyComponent() {
-  // Pass RGB8 pixel data; hook returns decoded cells
   const { cells, decoded, loading, error } = useBraille(pixels, 320, 240, 80, 30);
-  // decoded: [{ char, r, g, b }, ...]  — flat array, row-major order
 
-  const halfblock = useHalfBlock(pixels, 320, 240, 80, 30);
-  // halfblock.decoded: [{ rFg, gFg, bFg, rBg, gBg, bBg }, ...]
+  if (loading) return <p>Loading...</p>;
+  if (error) return <p>Error: {error.message}</p>;
+  if (!decoded) return null;
+
+  // decoded: [{ char, r, g, b }, ...] — flat array, row-major order
+  return (
+    <pre style={{ fontFamily: "monospace", lineHeight: "1", fontSize: "10px" }}>
+      {decoded.map((cell, i) => (
+        <span key={i} style={{ color: `rgb(${cell.r},${cell.g},${cell.b})` }}>
+          {cell.char}
+        </span>
+      ))}
+    </pre>
+  );
 }
 ```
+
+### useHalfBlock Hook
+
+```tsx
+import { useHalfBlock } from "terminal-pixel-animation-react";
+
+function MyComponent() {
+  const { decoded } = useHalfBlock(pixels, 320, 240, 80, 30);
+
+  // decoded: [{ rFg, gFg, bFg, rBg, gBg, bBg }, ...]
+  return (
+    <div>
+      {decoded?.map((cell, i) => (
+        <div
+          key={i}
+          style={{
+            display: "inline-block",
+            width: 8,
+            height: 14,
+            background: `linear-gradient(to bottom, rgb(${cell.rFg},${cell.gFg},${cell.bFg}) 50%, rgb(${cell.rBg},${cell.gBg},${cell.bBg}) 50%)`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+```
+
+### Real-time Webcam Rendering
+
+```tsx
+import { useState, useEffect, useRef } from "react";
+import { WasmProvider, useBraille } from "terminal-pixel-animation-react";
+
+function App() {
+  return (
+    <WasmProvider>
+      <WebcamDemo />
+    </WasmProvider>
+  );
+}
+
+function WebcamDemo() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [pixels, setPixels] = useState<Uint8Array | null>(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
+
+  useEffect(() => {
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.play();
+        }
+      });
+  }, []);
+
+  useEffect(() => {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d")!;
+
+    const capture = () => {
+      const video = videoRef.current;
+      if (!video || video.readyState < 2) return;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+      const rgb = new Uint8Array(canvas.width * canvas.height * 3);
+      for (let i = 0, j = 0; i < imageData.data.length; i += 4, j += 3) {
+        rgb[j] = imageData.data[i];
+        rgb[j + 1] = imageData.data[i + 1];
+        rgb[j + 2] = imageData.data[i + 2];
+      }
+
+      setPixels(rgb);
+      setSize({ w: canvas.width, h: canvas.height });
+    };
+
+    const id = requestAnimationFrame(function loop() {
+      capture();
+      requestAnimationFrame(loop);
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  return (
+    <div>
+      <video ref={videoRef} autoPlay playsInline style={{ display: "none" }} />
+      <PixelDisplay pixels={pixels} width={size.w} height={size.h} />
+    </div>
+  );
+}
+
+function PixelDisplay({ pixels, width, height }: {
+  pixels: Uint8Array | null; width: number; height: number;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { decoded } = useBraille(pixels, width, height, 100, 45);
+
+  useEffect(() => {
+    if (!decoded || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d")!;
+
+    canvas.width = 100 * 8;
+    canvas.height = 45 * 14;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.font = "14px monospace";
+    ctx.textBaseline = "top";
+
+    for (let i = 0; i < decoded.length; i++) {
+      const cell = decoded[i];
+      if (cell.char !== "\0" && cell.char !== " ") {
+        const col = i % 100;
+        const row = Math.floor(i / 100);
+        ctx.fillStyle = `rgb(${cell.r},${cell.g},${cell.b})`;
+        ctx.fillText(cell.char, col * 8, row * 14);
+      }
+    }
+  }, [decoded]);
+
+  return <canvas ref={canvasRef} style={{ background: "#000" }} />;
+}
+```
+
+---
+
+## API Reference
+
+### Rust (Native)
+
+```rust
+// Braille: 8 bytes per cell [utf8;4, R, G, B, _]
+let cells = render_braille(&pixels, w, h, cols, rows)?;
+
+// Half-block: 6 bytes per cell [R_fg, G_fg, B_fg, R_bg, G_bg, B_bg]
+let cells = render_half_block(&pixels, w, h, cols, rows)?;
+
+// Terminal output
+print_braille_to_terminal(&cells, cols, rows);
+print_halfblock_to_terminal(&cells, cols, rows);
+```
+
+### WASM (JavaScript)
+
+```js
+// Braille: Uint8Array, 8 bytes per cell
+const cells = render_braille(rgb, in_width, in_height, target_cols, target_rows);
+
+// Half-block: Uint8Array, 6 bytes per cell
+const cells = render_half_block(rgb, in_width, in_height, target_cols, target_rows);
+```
+
+### React Hooks
+
+| Hook | Arguments | Returns |
+|---|---|---|
+| `useBraille(pixels, w, h, cols, rows)` | `Uint8Array \| null`, 4 numbers | `{ cells, decoded, loading, error }` |
+| `useHalfBlock(pixels, w, h, cols, rows)` | `Uint8Array \| null`, 4 numbers | `{ cells, decoded, loading, error }` |
+
+---
+
 ## Building from Source
+
+### Dependencies
+
+- [Rust](https://rustup.rs/) (edition 2024)
+- [Odin compiler](https://odin-lang.org/)
+- [Zig compiler](https://ziglang.org/)
+- `objcopy` (binutils)
+- [wasm-pack](https://rustwasm.github.io/wasm-pack/) (for WASM builds)
 
 ### Native
 
@@ -203,17 +445,15 @@ cargo build --release
 wasm-pack build --target bundler --out-dir pkg
 ```
 
-The build script detects the target architecture and cross-compiles Odin and Zig source files accordingly (`freestanding_wasm32` / `wasm32-freestanding` for WASM).
+### React hooks
 
-### Dependencies
+```bash
+cd react && npm install && npm run build
+```
 
-- [Rust](https://rustup.rs/) (edition 2024)
-- [Odin compiler](https://odin-lang.org/)
-- [Zig compiler](https://ziglang.org/)
-- `objcopy` (binutils)
-- [wasm-pack](https://rustwasm.github.io/wasm-pack/) (for WASM builds)
+---
 
-## Example
+## Examples
 
 ### Native
 
@@ -224,56 +464,33 @@ cargo run --example demo -- path/to/image.png halfblock
 
 ### WASM
 
-After building with `wasm-pack`, serve the `pkg/` directory and open the demo:
-
 ```bash
 python3 -m http.server 8080
 # Open http://localhost:8080/pkg/wasm-demo.html in your browser
 ```
 
-The demo supports webcam live feed and video file playback, rendering frames to a canvas using `requestAnimationFrame`.
+Supports webcam live feed and video file playback.
 
-### React
-
-```bash
-cd react && npm install && npm run build
-```
+---
 
 ## Publishing
 
-### npm (WASM core + React hooks)
+### npm
 
 ```bash
-# 1. Login to npm (first time only)
 npm login
-
-# 2. Publish the core WASM package
-cd pkg
-npm publish
-
-# 3. Publish the React hooks package
-cd ../react
-npm publish
+cd pkg && npm publish
+cd ../react && npm publish
 ```
 
-### crates.io (Rust crate)
+### crates.io
 
 ```bash
-# 1. Login to crates.io (first time only)
 cargo login <your-api-token>
-
-# 2. Publish
 cargo publish
 ```
 
-### Version Management
-
-```bash
-# Update versions before publishing
-npm version patch   # 0.2.0 -> 0.2.1
-npm version minor   # 0.2.0 -> 0.3.0
-npm version major   # 0.2.0 -> 1.0.0
-```
+---
 
 ## License
 
